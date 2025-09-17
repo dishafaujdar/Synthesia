@@ -106,7 +106,6 @@ npm run dev
 
 - **Frontend**: http://localhost:3000
 - **Backend API**: http://localhost:3001
-- **Health Check**: http://localhost:3001/health
 
 ## 📊 API Endpoints
 
@@ -252,22 +251,6 @@ docker-compose -f docker-compose.test.yml up
 npm run test:integration
 ```
 
-## 📈 Performance Characteristics
-
-### Benchmark Results
-- **API Response Time**: < 100ms (95th percentile)
-- **Job Processing**: 5-30 seconds per research request
-- **Concurrent Jobs**: Up to 5 simultaneous jobs
-- **Database Queries**: < 50ms average
-- **Memory Usage**: ~150MB per worker process
-
-### Scalability Features
-- Horizontal job scaling with multiple workers
-- Database connection pooling
-- Redis-based caching
-- Stateless API design
-- Container orchestration ready
-
 ## 🔧 Advanced Configuration
 
 ### Job Queue Tuning
@@ -290,52 +273,6 @@ export const researchQueue = new Bull<ResearchJobData>('research', {
 });
 ```
 
-### Database Optimization
-```sql
--- Recommended indexes for high-performance queries
-CREATE INDEX CONCURRENTLY idx_research_requests_status_created 
-ON research_request (status, created_at DESC);
-
-CREATE INDEX CONCURRENTLY idx_task_logs_request_timestamp 
-ON task_log (research_request_id, timestamp DESC);
-```
-
-### Monitoring Setup
-```typescript
-// Custom metrics collection
-export const metricsCollector = {
-  recordJobDuration: (duration: number) => {
-    // Record to Prometheus/StatsD
-  },
-  recordAPILatency: (endpoint: string, duration: number) => {
-    // Track API performance
-  },
-};
-```
-
-## 🚨 Troubleshooting
-
-### Common Issues
-
-1. **Database Connection Issues**
-   - Check `DATABASE_URL` format
-   - Verify PostgreSQL is running
-   - Check connection limits
-
-2. **Redis Connection Issues**
-   - Verify Redis is running on specified port
-   - Check `REDIS_URL` configuration
-   - Monitor Redis memory usage
-
-3. **Job Processing Stuck**
-   - Check job queue status: `GET /api/admin/queue/stats`
-   - Review worker logs
-   - Clear stalled jobs if necessary
-
-4. **External API Failures**
-   - Verify API keys are valid
-   - Check rate limiting status
-   - Review circuit breaker logs
 
 ### Debugging Tools
 ```bash
@@ -358,32 +295,3 @@ redis-cli monitor
 - System Architecture: `/docs/architecture.md`
 - Database Schema: `/docs/database-schema.md`
 - API Documentation: `/docs/api-reference.md`
-
-### Code Examples
-- Custom Job Processors: `/examples/custom-processors/`
-- External API Clients: `/examples/api-clients/`
-- Testing Utilities: `/examples/testing/`
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make changes with tests
-4. Submit pull request with detailed description
-
-### Development Guidelines
-- Use TypeScript strict mode
-- Follow established patterns
-- Write comprehensive tests
-- Update documentation
-- Use conventional commits
-
-## 📄 License
-
-This project is licensed under the MIT License - see LICENSE file for details.
-
----
-
-Built with ❤️ by the AI Research Agent Team
-
-**Note**: This implementation showcases enterprise-level Node.js and React patterns suitable for high-scale production systems.
