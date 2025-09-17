@@ -1,0 +1,153 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum RequestStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum TaskLogLevel {
+  INFO
+  WARN
+  ERROR
+  DEBUG
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  role      UserRole @default(USER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  researchRequests ResearchRequest[]
+  taskLogs         TaskLog[]
+
+  @@map("users")
+}
+
+model ResearchRequest {
+  id            String        @id @default(cuid())
+  topic         String
+  priority      String        @default("normal")
+  status        RequestStatus @default(PENDING)
+  userId        String?
+  correlationId String        @unique
+  maxResults    Int           @default(10)
+  progress      Float         @default(0.0)
+  jobId         String?
+  error         String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  completedAt   DateTime?
+
+  user    User?             @relation(fields: [userId], references: [id])
+  results ResearchResult[]
+  taskLogs TaskLog[]
+
+  @@map("research_requests")
+}
+
+model ResearchResult {
+  id                String   @id @default(cuid())
+  researchRequestId String
+  summary           String
+  keyInsights       Json
+  keywords          Json?
+  totalArticles     Int?
+  sources           Json
+  confidence        Float
+  processingTime    Int
+  createdAt         DateTime @default(now())
+
+  researchRequest ResearchRequest @relation(fields: [researchRequestId], references: [id])
+  articles        Article[]
+
+  @@map("research_results")
+}
+
+model Article {
+  id               String @id @default(cuid())
+  title            String
+  url              String
+  content          String
+  source           String
+  publishedDate    DateTime?
+  relevanceScore   Float
+  sentiment        String?
+  wordCount        Int?
+  summary          String?
+  researchResultId String?
+  extractedAt      DateTime @default(now())
+
+  researchResult ResearchResult? @relation(fields: [researchResultId], references: [id])
+
+  @@map("articles")
+}
+
+model TaskLog {
+  id                String        @id @default(cuid())
+  level             TaskLogLevel
+  message           String
+  step              String?
+  context           Json?
+  researchRequestId String?
+  userId            String?
+  timestamp         DateTime      @default(now())
+
+  researchRequest ResearchRequest? @relation(fields: [researchRequestId], references: [id])
+  user            User?            @relation(fields: [userId], references: [id])
+
+  @@map("task_logs")
+}
+
+model CacheEntry {
+  id         String   @id @default(cuid())
+  key        String   @unique
+  value      Json
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+
+  @@map("cache_entries")
+}
+
+model SystemMetrics {
+  id               String   @id @default(cuid())
+  metricName       String
+  metricValue      Float
+  tags             Json?
+  timestamp        DateTime @default(now())
+
+  @@map("system_metrics")
+}
+
+model JobQueue {
+  id          String   @id @default(cuid())
+  name        String
+  data        Json
+  priority    Int      @default(0)
+  status      String   @default("waiting")
+  attempts    Int      @default(0)
+  createdAt   DateTime @default(now())
+  processedAt DateTime?
+
+  @@map("job_queue")
+}

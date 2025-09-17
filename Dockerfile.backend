@@ -1,0 +1,26 @@
+# Multi-stage build for backend
+FROM node:20-alpine AS backend-builder
+
+WORKDIR /app/backend
+COPY backend/package*.json ./
+RUN npm ci --only=production && npm cache clean --force
+
+COPY backend/ ./
+RUN npm run build
+
+# Production backend image
+FROM node:20-alpine AS backend-production
+
+WORKDIR /app
+RUN addgroup -g 1001 -S nodejs && adduser -S backend -u 1001
+
+COPY --from=backend-builder --chown=backend:nodejs /app/backend/dist ./dist
+COPY --from=backend-builder --chown=backend:nodejs /app/backend/node_modules ./node_modules
+COPY --from=backend-builder --chown=backend:nodejs /app/backend/package*.json ./
+COPY --from=backend-builder --chown=backend:nodejs /app/backend/prisma ./prisma
+
+USER backend
+
+EXPOSE 3001
+
+CMD ["npm", "start"]
