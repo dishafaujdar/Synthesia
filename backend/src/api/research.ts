@@ -10,7 +10,7 @@ const router = express.Router();
 
 // Validation schemas
 const createResearchSchema = z.object({
-  topic: z.string().min(5, 'Topic must be at least 5 characters').max(200, 'Topic too long'),
+  topic: z.string().min(3, 'Topic must be at least 3 characters').max(200, 'Topic too long'),
   priority: z.enum(['low', 'normal', 'high']).default('normal'),
 });
 
@@ -646,6 +646,7 @@ router.delete('/', async (req, res, next) => {
     }
   } catch (error) {
     next(error);
+    return;
   }
 });
 

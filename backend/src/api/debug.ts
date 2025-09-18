@@ -1,8 +1,11 @@
 import express from 'express';
 import { queueManager } from '@/jobs/queue';
 import { ProcessedArticle } from '@/types';
+// import DatabaseIntegrationService from '@/services/database-integration';
+// import { db } from '@/utils/supabase';
 
 const router = express.Router();
+// const dbIntegration = new DatabaseIntegrationService(db);
 
 // Get queue statistics
 router.get('/queue-stats', async (_req, res) => {
@@ -158,6 +161,32 @@ router.post('/clean-queue', async (_req, res) => {
   } catch (error) {
     res.status(500).json({
       error: 'Failed to clean queue',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// Database integration health check
+router.get('/database-health', async (_req, res) => {
+  try {
+    // const healthCheck = await dbIntegration.healthCheck();
+    res.json({ message: 'Database integration temporarily disabled' });
+  } catch (error) {
+    res.status(500).json({
+      error: 'Failed to check database health',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// Database stats comparison
+router.get('/database-stats', async (_req, res) => {
+  try {
+    // const stats = await dbIntegration.getStats();
+    res.json({ message: 'Database stats temporarily disabled' });
+  } catch (error) {
+    res.status(500).json({
+      error: 'Failed to get database stats',
       message: error instanceof Error ? error.message : 'Unknown error'
     });
   }

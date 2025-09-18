@@ -311,20 +311,20 @@ export function ResearchList({ onSelectRequest }: ResearchListProps) {
                   </div>
                 </div>
                 
-                {request.results && (
+                {request.results && Array.isArray(request.results) && request.results.length > 0 && (
                   <div className="mt-3 pt-3 border-t">
                     <div className="grid grid-cols-3 gap-4 text-xs">
                       <div>
                         <span className="text-muted-foreground">Articles:</span>
-                        <span className="ml-1 font-medium">{request.results?.totalArticles || 0}</span>
+                        <span className="ml-1 font-medium">{request.results[0]?.totalArticles || 0}</span>
                       </div>
                       <div>
                         <span className="text-muted-foreground">Keywords:</span>
-                        <span className="ml-1 font-medium">{request.results?.keywords?.length || 0}</span>
+                        <span className="ml-1 font-medium">{request.results[0]?.keywords?.length || 0}</span>
                       </div>
                       <div>
                         <span className="text-muted-foreground">Confidence:</span>
-                        <span className="ml-1 font-medium">{request.results ? Math.round(request.results.confidence * 100) : 0}%</span>
+                        <span className="ml-1 font-medium">{request.results[0]?.confidence ? Math.round(request.results[0].confidence * 100) : 0}%</span>
                       </div>
                     </div>
                   </div>

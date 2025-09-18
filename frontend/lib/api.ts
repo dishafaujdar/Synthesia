@@ -9,7 +9,7 @@ export interface ResearchRequest {
   updatedAt: string
   completedAt?: string
   error?: string
-  results?: ResearchResult
+  results?: ResearchResult[] // Changed from single object to array
 }
 
 export interface ResearchResult {
@@ -61,6 +61,7 @@ class ApiClient {
         'Content-Type': 'application/json',
         ...options?.headers,
       },
+      credentials: 'include',
       ...options,
     })
 

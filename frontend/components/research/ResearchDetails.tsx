@@ -193,8 +193,8 @@ export function ResearchDetails({ requestId, onClose }: ResearchDetailsProps) {
                 }`}
               >
                 {tab}
-                {tab === 'articles' && request.results && (
-                  <span className="ml-1 text-xs">({request.results?.totalArticles || 0})</span>
+                {tab === 'articles' && request.results && request.results.length > 0 && (
+                  <span className="ml-1 text-xs">({request.results[0]?.totalArticles || 0})</span>
                 )}
                 {tab === 'logs' && (
                   <span className="ml-1 text-xs">({logs.length})</span>
@@ -235,20 +235,20 @@ export function ResearchDetails({ requestId, onClose }: ResearchDetailsProps) {
               </div>
             )}
 
-            {request.results && (
+            {request.results && request.results.length > 0 && (
               <div className="space-y-4">
                 <div>
                   <h4 className="font-medium text-sm mb-2">Summary</h4>
                   <p className="text-sm text-muted-foreground leading-relaxed">
-                    {request.results?.summary || 'No summary available'}
+                    {request.results[0]?.summary || 'No summary available'}
                   </p>
                 </div>
 
                 <div>
                   <h4 className="font-medium text-sm mb-2">Key Insights</h4>
                   <ul className="space-y-1">
-                    {request.results?.keyInsights && Array.isArray(request.results.keyInsights) 
-                      ? request.results.keyInsights.map((insight, index) => (
+                    {request.results[0]?.keyInsights && Array.isArray(request.results[0].keyInsights) 
+                      ? request.results[0].keyInsights.map((insight, index) => (
                           <li key={index} className="text-sm text-muted-foreground flex items-start">
                             <span className="w-1.5 h-1.5 bg-primary rounded-full mt-2 mr-2 flex-shrink-0" />
                             {insight}
@@ -264,8 +264,8 @@ export function ResearchDetails({ requestId, onClose }: ResearchDetailsProps) {
                 <div>
                   <h4 className="font-medium text-sm mb-2">Keywords</h4>
                   <div className="flex flex-wrap gap-2">
-                    {request.results?.keywords && Array.isArray(request.results.keywords)
-                      ? request.results.keywords.map((keyword, index) => (
+                    {request.results[0]?.keywords && Array.isArray(request.results[0].keywords)
+                      ? request.results[0].keywords.map((keyword, index) => (
                           <span
                             key={index}
                             className="px-2 py-1 bg-secondary text-secondary-foreground rounded-md text-xs"
@@ -282,15 +282,15 @@ export function ResearchDetails({ requestId, onClose }: ResearchDetailsProps) {
 
                 <div className="grid grid-cols-3 gap-4 p-4 bg-muted rounded-lg">
                   <div className="text-center">
-                    <div className="text-lg font-semibold">{request.results?.totalArticles || 0}</div>
+                    <div className="text-lg font-semibold">{request.results[0]?.totalArticles || 0}</div>
                     <div className="text-xs text-muted-foreground">Articles</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-lg font-semibold">{request.results?.confidence ? Math.round(request.results.confidence * 100) : 0}%</div>
+                    <div className="text-lg font-semibold">{request.results[0]?.confidence ? Math.round(request.results[0].confidence * 100) : 0}%</div>
                     <div className="text-xs text-muted-foreground">Confidence</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-lg font-semibold">{request.results?.processingTime ? Math.round(request.results.processingTime / 1000) : 0}s</div>
+                    <div className="text-lg font-semibold">{request.results[0]?.processingTime ? Math.round(request.results[0].processingTime / 1000) : 0}s</div>
                     <div className="text-xs text-muted-foreground">Duration</div>
                   </div>
                 </div>
@@ -299,10 +299,10 @@ export function ResearchDetails({ requestId, onClose }: ResearchDetailsProps) {
           </div>
         )}
 
-        {activeTab === 'articles' && request.results && (
+        {activeTab === 'articles' && request.results && request.results.length > 0 && (
           <div className="space-y-4">
-            {request.results.articles && Array.isArray(request.results.articles)
-              ? request.results.articles.map((article, index) => (
+            {request.results[0].articles && Array.isArray(request.results[0].articles)
+              ? request.results[0].articles.map((article, index) => (
               <div key={article.id} className="border rounded-lg p-4">
                 <div className="flex items-start justify-between mb-2">
                   <h4 className="font-medium text-sm">{article.title}</h4>
