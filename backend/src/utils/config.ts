@@ -4,6 +4,9 @@ import { Config } from '@/types';
 // Load environment variables
 dotenv.config();
 
+const redis = "redis://default:3AD6UvtGLIBJaMOVAPOE6DPYnZNqzqGU@redis-10921.c74.us-east-1-4.ec2.redns.redis-cloud.com:10921"
+
+
 const env = process.env;
 
 const config: Config = {
@@ -17,7 +20,7 @@ const config: Config = {
   },
   
   redis: {
-    url: env['REDIS_URL'] || 'redis://localhost:6379',
+    url: env['REDIS_URL'] || redis,
   },
   
   auth: {
@@ -69,7 +72,7 @@ const config: Config = {
 };
 
 // Validation
-const requiredEnvVars = ['DATABASE_URL', 'JWT_SECRET'];
+const requiredEnvVars = ['DATABASE_URL', 'JWT_SECRET', 'REDIS_URL'];
 
 if (config.nodeEnv === 'production') {
   requiredEnvVars.push('REDIS_URL');

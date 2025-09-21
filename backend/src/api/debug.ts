@@ -1,195 +1,168 @@
-import express from 'express';
-import { queueManager } from '@/jobs/queue';
-import { ProcessedArticle } from '@/types';
-// import DatabaseIntegrationService from '@/services/database-integration';
-// import { db } from '@/utils/supabase';
+import express from 'express'
+import { queueManager } from '../services/queue-manager'
+import { testRedisConnection } from '../config/redis'
+import { v4 as uuidv4 } from 'uuid'
 
-const router = express.Router();
-// const dbIntegration = new DatabaseIntegrationService(db);
+const router = express.Router()
+
+// Redis and Queue health check
+router.get('/health', async (_req, res) => {
+  try {
+    const redisOk = await testRedisConnection()
+    const queueAvailable = queueManager.isAvailable()
+    const queueStats = await queueManager.getQueueStats()
+    
+    const health = {
+      timestamp: new Date().toISOString(),
+      redis: {
+        connected: redisOk,
+        configured: !!process.env['REDIS_URL']
+      },
+      queue: {
+        available: queueAvailable,
+        stats: queueStats?.stats || null,
+        healthy: queueStats?.isHealthy || false
+      },
+      environment: {
+        nodeEnv: process.env['NODE_ENV'] || 'development',
+        hasRedisUrl: !!process.env['REDIS_URL']
+      }
+    }
+
+    const isHealthy = redisOk && queueAvailable
+    
+    res.status(isHealthy ? 200 : 503).json({
+      status: isHealthy ? 'healthy' : 'unhealthy',
+      ...health
+    })
+  } catch (error: any) {
+    res.status(500).json({
+      status: 'error',
+      message: error.message
+    })
+  }
+})
 
 // Get queue statistics
 router.get('/queue-stats', async (_req, res) => {
   try {
-    const stats = await queueManager.getQueueStats();
-    res.json(stats);
-  } catch (error) {
-    res.status(500).json({ 
-      error: 'Failed to get queue stats',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    });
-  }
-});
+    if (!queueManager.isAvailable()) {
+      return res.status(503).json({ 
+        error: 'Queue manager not available',
+        stats: { waiting: 0, active: 0, completed: 0, failed: 0, total: 0 }
+      })
+    }
 
-// Test job processing with a simple topic
+    const health = await queueManager.getQueueStats()
+    return res.json(health?.stats || { waiting: 0, active: 0, completed: 0, failed: 0, total: 0 })
+  } catch (error: any) {
+    return res.status(500).json({ 
+      error: 'Failed to get queue stats',
+      message: error.message,
+      stats: { waiting: 0, active: 0, completed: 0, failed: 0, total: 0 }
+    })
+  }
+})
+
+// Test job processing
 router.post('/test-job', async (req, res) => {
   try {
-    const { topic = 'artificial intelligence' } = req.body;
+    const { topic = 'artificial intelligence test' } = req.body
     
-    const job = await queueManager.addJob({
-      id: `test-${Date.now()}`,
-      topic,
-      priority: 'normal',
-      correlationId: `test-corr-${Date.now()}`,
-      userId: 'test-user',
-    }, 'normal');
+    console.log(`Test job request received for topic: "${topic}"`)
+    
+    if (!queueManager.isAvailable()) {
+      return res.status(503).json({
+        error: 'Queue manager not available',
+        message: 'Cannot add test job - queue system not initialized',
+        topic
+      })
+    }
 
-    res.json({
-      message: 'Test job added to queue',
+    const jobData = {
+      id: `test-${uuidv4()}`,
+      topic,
+      priority: 'normal' as const
+    }
+
+    console.log(`Adding test job with data:`, jobData)
+    
+    const job = await queueManager.addJob(jobData)
+
+    console.log(`Test job added successfully:`, {
       jobId: job.id,
       topic,
       status: 'queued'
-    });
-  } catch (error) {
-    res.status(500).json({
-      error: 'Failed to add test job',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    });
-  }
-});
-
-// Get job details
-router.get('/job/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const job = await queueManager.getJob(id);
-    
-    if (!job) {
-      return res.status(404).json({ error: 'Job not found' });
-    }
+    })
 
     return res.json({
-      id: job.id,
-      data: job.data,
-      progress: job.progress(),
-      state: await job.getState(),
-      processedOn: job.processedOn,
-      finishedOn: job.finishedOn,
-      failedReason: job.failedReason,
-      attempts: job.opts.attempts,
-      delay: job.opts.delay,
-    });
-  } catch (error) {
-    return res.status(500).json({
-      error: 'Failed to get job details',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    });
-  }
-});
-
-// Test external APIs
-router.get('/test-apis/:topic?', async (req, res) => {
-  const topic = req.params.topic || 'machine learning';
-  
-  try {
-    const WikipediaClient = (await import('@/services/external/WikipediaClient')).default;
-    const NewsAPIClient = (await import('@/services/external/NewsAPIClient')).default;
-    
-    const wikipedia = new WikipediaClient();
-    const newsApi = new NewsAPIClient();
-    
-    // Test Wikipedia
-    const wikiHealthy = await wikipedia.isHealthy();
-    let wikiArticles: ProcessedArticle[] = [];
-    if (wikiHealthy) {
-      wikiArticles = await wikipedia.search(topic);
-    }
-
-    // Test NewsAPI
-    const newsHealthy = await newsApi.isHealthy();
-    let newsArticles: ProcessedArticle[] = [];
-    if (newsHealthy) {
-      newsArticles = await newsApi.search(topic);
-    }
-
-    res.json({
+      message: 'Test job added to queue',
+      jobId: job.id,
       topic,
-      apis: {
-        wikipedia: {
-          healthy: wikiHealthy,
-          articlesFound: wikiArticles.length,
-          articles: wikiArticles.slice(0, 3).map(a => ({
-            title: a.title,
-            url: a.url,
-            source: a.source
-          }))
-        },
-        newsapi: {
-          healthy: newsHealthy,
-          articlesFound: newsArticles.length,
-          articles: newsArticles.slice(0, 3).map(a => ({
-            title: a.title,
-            url: a.url,
-            source: a.source
-          }))
-        }
-      }
-    });
-  } catch (error) {
-    res.status(500).json({
-      error: 'Failed to test APIs',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    });
+      status: 'queued',
+      data: jobData
+    })
+  } catch (error: any) {
+    console.error(`Failed to add test job:`, error)
+    return res.status(500).json({
+      error: 'Failed to add test job',
+      message: error.message
+    })
   }
-});
+})
 
-// Redis health check
+// Redis health check only
 router.get('/redis-health', async (_req, res) => {
   try {
-    // Try to import queue and check if it works
-    const { researchQueue } = await import('@/jobs/queue');
+    const connected = await testRedisConnection()
     
-    // Try to get queue stats as a health check
-    await researchQueue.getWaiting();
+    const result = {
+      timestamp: new Date().toISOString(),
+      redis: {
+        configured: !!process.env['REDIS_URL'],
+        connected,
+        url: process.env['REDIS_URL'] ? 'configured' : 'not configured'
+      },
+      environment: {
+        redisUrl: process.env['REDIS_URL'] ? 'set' : 'not set',
+        redisUrlFormat: process.env['REDIS_URL']?.startsWith('rediss://') ? 'TLS enabled' : 
+                       process.env['REDIS_URL']?.startsWith('redis://') ? 'No TLS' : 'invalid format'
+      }
+    }
     
-    res.json({ 
-      status: 'healthy',
-      message: 'Redis connection is working'
-    });
-  } catch (error) {
+    res.status(connected ? 200 : 503).json({
+      status: connected ? 'healthy' : 'unhealthy',
+      ...result
+    })
+  } catch (error: any) {
     res.status(500).json({ 
-      status: 'unhealthy',
-      error: error instanceof Error ? error.message : 'Unknown error'
-    });
+      status: 'error',
+      error: error.message
+    })
   }
-});
+})
 
-// Clean queue
-router.post('/clean-queue', async (_req, res) => {
+// Configuration check
+router.get('/config', async (_req, res) => {
   try {
-    await queueManager.cleanQueue();
-    res.json({ message: 'Queue cleaned successfully' });
-  } catch (error) {
+    res.json({
+      redis: {
+        configured: !!process.env['REDIS_URL'],
+        format: process.env['REDIS_URL']?.startsWith('rediss://') ? 'TLS' : 
+                process.env['REDIS_URL']?.startsWith('redis://') ? 'No TLS' : 'Invalid'
+      },
+      queue: {
+        available: queueManager.isAvailable(),
+        type: 'Bull.js with Redis backend'
+      },
+      environment: process.env['NODE_ENV'] || 'development'
+    })
+  } catch (error: any) {
     res.status(500).json({
-      error: 'Failed to clean queue',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    });
+      error: 'Failed to get configuration',
+      message: error.message
+    })
   }
-});
+})
 
-// Database integration health check
-router.get('/database-health', async (_req, res) => {
-  try {
-    // const healthCheck = await dbIntegration.healthCheck();
-    res.json({ message: 'Database integration temporarily disabled' });
-  } catch (error) {
-    res.status(500).json({
-      error: 'Failed to check database health',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    });
-  }
-});
-
-// Database stats comparison
-router.get('/database-stats', async (_req, res) => {
-  try {
-    // const stats = await dbIntegration.getStats();
-    res.json({ message: 'Database stats temporarily disabled' });
-  } catch (error) {
-    res.status(500).json({
-      error: 'Failed to get database stats',
-      message: error instanceof Error ? error.message : 'Unknown error'
-    });
-  }
-});
-
-export default router;
+export default router

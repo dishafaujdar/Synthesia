@@ -50,7 +50,7 @@ class ApiClient {
   private baseUrl: string
 
   constructor() {
-    this.baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+    this.baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
   }
 
   private async request<T>(endpoint: string, options?: RequestInit): Promise<T> {
@@ -74,7 +74,7 @@ class ApiClient {
   }
 
   async createResearchRequest(data: CreateResearchRequest): Promise<ResearchRequest> {
-    return this.request<ResearchRequest>('/api/v1/research', {
+    return this.request<ResearchRequest>('/api/research', {
       method: 'POST',
       body: JSON.stringify(data),
     })
@@ -89,11 +89,11 @@ class ApiClient {
       pages: number
     }
   }> {
-    return this.request(`/api/v1/research?page=${page}&limit=${limit}`)
+    return this.request(`/api/research?page=${page}&limit=${limit}`)
   }
 
   async getResearchRequest(id: string): Promise<ResearchRequest> {
-    return this.request<ResearchRequest>(`/api/v1/research/${id}`)
+    return this.request<ResearchRequest>(`/api/research/${id}`)
   }
 
   async getResearchStatus(id: string): Promise<{
@@ -103,21 +103,21 @@ class ApiClient {
     error?: string
     updatedAt: string
   }> {
-    return this.request(`/api/v1/research/${id}/status`)
+    return this.request(`/api/research/${id}/status`)
   }
 
   async getResearchLogs(id: string): Promise<TaskLog[]> {
-    return this.request<TaskLog[]>(`/api/v1/research/${id}/logs`)
+    return this.request<TaskLog[]>(`/api/research/${id}/logs`)
   }
 
   async cancelResearchRequest(id: string): Promise<{ message: string }> {
-    return this.request(`/api/v1/research/${id}`, {
+    return this.request(`/api/research/${id}`, {
       method: 'DELETE',
     })
   }
 
   async deleteResearchRequest(id: string, force = false): Promise<{ message: string }> {
-    const url = force ? `/api/v1/research/${id}?force=true` : `/api/v1/research/${id}`;
+    const url = force ? `/api/research/${id}?force=true` : `/api/research/${id}`;
     return this.request(url, {
       method: 'DELETE',
     })
@@ -128,7 +128,7 @@ class ApiClient {
     status?: string
     olderThan?: string
   }): Promise<{ message: string; deletedCount: number }> {
-    return this.request('/api/v1/research', {
+    return this.request('/api/research', {
       method: 'DELETE',
       body: JSON.stringify(data),
     })

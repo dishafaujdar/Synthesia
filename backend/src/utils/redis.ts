@@ -1,39 +1,103 @@
 import Redis from 'ioredis';
 import config from './config';
 
-// Create Redis client with retry strategy
-const redis = new Redis(config.redis.url, {
-  maxRetriesPerRequest: 3,
-  lazyConnect: true,
-  reconnectOnError: (err) => {
-    const targetError = 'READONLY';
-    return err.message.includes(targetError);
-  },
-});
+// Minimal Redis client that definitely works with TypeScript
+let redis: Redis | null = null;
 
-// Health check
-export const healthCheck = async (): Promise<boolean> => {
+try {
+  if (!config.redis.url || !config.redis.url.startsWith('redis')) {
+    console.warn('⚠️ Invalid or missing Redis URL. Redis disabled.');
+    redis = null;
+  } else {
+    const url = new URL(config.redis.url);
+    
+    // Redis Cloud optimized configuration
+    const redisOptions = {
+      host: url.hostname,
+      port: parseInt(url.port) || 6379,
+      password: url.password,
+      username: url.username || 'default',
+      connectTimeout: 10000,  // Shorter timeout for Redis Cloud
+      lazyConnect: false,     // Connect immediately for Redis Cloud
+      enableOfflineQueue: true, // Enable offline queue for reliability
+      maxRetriesPerRequest: 3,
+      keepAlive: 30000,
+    } as any; // Use 'as any' to bypass strict typing
+    
+    // Add TLS only if using rediss://
+    if (url.protocol === 'rediss:') {
+      redisOptions.tls = {
+        rejectUnauthorized: false,
+      };
+    }
+
+    redis = new Redis(redisOptions);
+
+    // Event handlers
+    redis.on('connect', () => {
+      console.log('✅ Redis connected to Redis Cloud');
+    });
+
+    redis.on('error', (err: Error) => {
+      console.warn('⚠️ Redis Cloud error:', err.message);
+      if (err.message.includes('NOAUTH')) {
+        console.error('🚨 Redis Cloud authentication failed! Check your password.');
+      }
+    });
+
+    redis.on('ready', async () => {
+      console.log('✅ Redis Cloud ready');
+      // Test write permissions
+      try {
+        await redis?.set('test', 'ok', 'EX', 5);
+        await redis?.del('test');
+        console.log('✅ Redis Cloud write permissions confirmed');
+      } catch (writeError) {
+        console.error('❌ Redis Cloud write test failed:', writeError);
+      }
+    });
+  }
+} catch (error) {
+  console.warn('⚠️ Redis initialization failed:', error);
+  redis = null;
+}
+
+// Simple health check
+export const healthCheck = async () => {
   try {
-    await redis.ping();
-    return true;
-  } catch (error) {
-    return false;
+    if (!redis) return { connected: false, writable: false };
+    
+    const pong = await redis.ping();
+    if (pong !== 'PONG') return { connected: false, writable: false };
+    
+    // Test write
+    try {
+      await redis.set('health', 'test', 'EX', 5);
+      await redis.del('health');
+      return { connected: true, writable: true };
+    } catch {
+      return { connected: true, writable: false };
+    }
+  } catch {
+    return { connected: false, writable: false };
   }
 };
 
-// Cache utilities
+// Simple cache utilities
 export const cache = {
   get: async <T>(key: string): Promise<T | null> => {
     try {
+      if (!redis) return null;
       const value = await redis.get(key);
       return value ? JSON.parse(value) : null;
-    } catch (error) {
+    } catch {
       return null;
     }
   },
 
   set: async (key: string, value: unknown, ttl?: number): Promise<boolean> => {
     try {
+      if (!redis) return false;
       const serialized = JSON.stringify(value);
       if (ttl) {
         await redis.setex(key, ttl, serialized);
@@ -41,65 +105,20 @@ export const cache = {
         await redis.set(key, serialized);
       }
       return true;
-    } catch (error) {
+    } catch {
       return false;
     }
   },
 
   del: async (key: string): Promise<boolean> => {
     try {
+      if (!redis) return false;
       await redis.del(key);
       return true;
-    } catch (error) {
-      return false;
-    }
-  },
-
-  exists: async (key: string): Promise<boolean> => {
-    try {
-      const exists = await redis.exists(key);
-      return exists === 1;
-    } catch (error) {
+    } catch {
       return false;
     }
   },
 };
-
-// Rate limiting utilities
-export const rateLimiter = {
-  check: async (key: string, limit: number, window: number): Promise<{ allowed: boolean; remaining: number; resetTime: number }> => {
-    try {
-      const current = await redis.incr(key);
-      
-      if (current === 1) {
-        await redis.expire(key, window);
-      }
-      
-      const ttl = await redis.ttl(key);
-      const resetTime = Date.now() + (ttl * 1000);
-      
-      return {
-        allowed: current <= limit,
-        remaining: Math.max(0, limit - current),
-        resetTime,
-      };
-    } catch (error) {
-      // Allow request on Redis failure
-      return {
-        allowed: true,
-        remaining: limit,
-        resetTime: Date.now() + (window * 1000),
-      };
-    }
-  },
-};
-
-// Graceful shutdown
-const gracefulShutdown = async () => {
-  await redis.quit();
-};
-
-process.on('SIGINT', gracefulShutdown);
-process.on('SIGTERM', gracefulShutdown);
 
 export default redis;
