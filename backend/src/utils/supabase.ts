@@ -1,4 +1,4 @@
-import { PrismaClient, Prisma } from '@prisma/client'
+import { PrismaClient } from '@prisma/client'
 
 // Singleton Prisma client with optimized configuration
 class DatabaseClient {
@@ -29,37 +29,6 @@ class DatabaseClient {
 
 // Export the singleton instance
 export const db = DatabaseClient.getInstance()
-
-// Export Prisma types for use throughout your app
-export type { 
-  ResearchRequest, 
-  ResearchResult, 
-  Article, 
-  TaskLog, 
-  User,
-  RequestStatus,
-  UserRole 
-} from '@prisma/client'
-
-// Export Prisma utility types
-export type ResearchRequestWithResults = Prisma.ResearchRequestGetPayload<{
-  include: {
-    research_results: {
-      include: {
-        articles: true
-      }
-    }
-    task_logs: true
-    user: true
-  }
-}>
-
-export type ResearchResultWithArticles = Prisma.ResearchResultGetPayload<{
-  include: {
-    articles: true
-    research_request: true
-  }
-}>
 
 // Database helper functions
 export class DatabaseHelper {
@@ -172,7 +141,7 @@ export class DatabaseHelper {
 
 // Database transaction helper
 export async function withTransaction<T>(
-  callback: (tx: Prisma.TransactionClient) => Promise<T>
+  callback: (tx: any) => Promise<T>
 ): Promise<T> {
   return db.$transaction(callback, {
     maxWait: 5000, // 5 seconds

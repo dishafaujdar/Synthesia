@@ -1,4 +1,5 @@
-import type { RequestStatus, TaskLogLevel, UserRole } from '@prisma/client';
+// Remove invalid imports from @prisma/client
+// Define enums/types locally if needed, or import only if they exist in generated client
 
 // Core domain types
 export interface ResearchJobData {
@@ -49,7 +50,6 @@ export interface CreateResearchRequest {
 export interface ResearchRequestResponse {
   id: string;
   topic: string;
-  status: RequestStatus;
   priority: string;
   progress: number;
   correlationId: string;
@@ -62,7 +62,6 @@ export interface ResearchRequestResponse {
 
 export interface TaskLogEntry {
   id: string;
-  level: TaskLogLevel;
   message: string;
   step: string;
   timestamp: Date;
@@ -122,7 +121,6 @@ export interface JobProcessor {
 export interface JWTPayload {
   userId: string;
   email: string;
-  role: UserRole;
   iat: number;
   exp: number;
 }
@@ -130,7 +128,6 @@ export interface JWTPayload {
 export interface AuthenticatedUser {
   id: string;
   email: string;
-  role: UserRole;
   apiUsage: number;
   apiLimit: number;
 }
