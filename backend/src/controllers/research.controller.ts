@@ -267,6 +267,23 @@ export class ResearchController {
       }
 
       // Force delete or delete completed/failed tasks
+      // 1. Find all ResearchResult IDs for this request
+      const results = await prisma.researchResult.findMany({
+        where: { researchRequestId: id },
+        select: { id: true }
+      })
+      const resultIds = results.map(r => r.id)
+      if (resultIds.length > 0) {
+        // 2. Delete all Articles linked to these ResearchResults
+        await prisma.article.deleteMany({
+          where: { researchResultId: { in: resultIds } }
+        })
+        // 3. Delete all ResearchResults for this request
+        await prisma.researchResult.deleteMany({
+          where: { researchRequestId: id }
+        })
+      }
+      // 4. Delete the ResearchRequest
       await prisma.researchRequest.delete({
         where: { id }
       })
@@ -306,6 +323,33 @@ export class ResearchController {
         }
       }
 
+      // Find all researchRequest IDs to delete
+      const requestsToDelete = await prisma.researchRequest.findMany({
+        where: whereClause,
+        select: { id: true }
+      })
+      const requestIds = requestsToDelete.map(r => r.id)
+
+      // Delete dependent ResearchResult and Article records first
+      if (requestIds.length > 0) {
+        // Delete Articles linked to ResearchResults of these requests
+        const results = await prisma.researchResult.findMany({
+          where: { researchRequestId: { in: requestIds } },
+          select: { id: true }
+        })
+        const resultIds = results.map(r => r.id)
+        if (resultIds.length > 0) {
+          await prisma.article.deleteMany({
+            where: { researchResultId: { in: resultIds } }
+          })
+        }
+        // Delete ResearchResults
+        await prisma.researchResult.deleteMany({
+          where: { researchRequestId: { in: requestIds } }
+        })
+      }
+
+      // Now delete the ResearchRequests
       const result = await prisma.researchRequest.deleteMany({
         where: whereClause
       })
