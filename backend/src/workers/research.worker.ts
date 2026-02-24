@@ -142,12 +142,12 @@ export class ResearchWorker {
       // Search Wikipedia
       const searchUrl = `https://en.wikipedia.org/w/api.php?action=opensearch&search=${encodeURIComponent(topic)}&limit=5&format=json&origin=*`
       const searchResponse = await fetch(searchUrl)
-      const searchData = await searchResponse.json()
+      const searchData = (await searchResponse.json()) as [string, string[], string[], string[]]
       
       const articles = []
-      const titles = searchData[1] || []
-      const descriptions = searchData[2] || []
-      const urls = searchData[3] || []
+      const titles = searchData[1] ?? []
+      const descriptions = searchData[2] ?? []
+      const urls = searchData[3] ?? []
       
       for (let i = 0; i < Math.min(titles.length, 3); i++) {
         articles.push({
@@ -178,10 +178,10 @@ export class ResearchWorker {
       // Search HackerNews using Algolia API
       const searchUrl = `https://hn.algolia.com/api/v1/search?query=${encodeURIComponent(topic)}&tags=story&hitsPerPage=5`
       const response = await fetch(searchUrl)
-      const data = await response.json()
+      const data = (await response.json()) as { hits?: Array<{ title?: string; url?: string; story_text?: string; points?: number; created_at?: string }> }
       
       const articles = []
-      const hits = data.hits || []
+      const hits = data.hits ?? []
       
       for (const hit of hits.slice(0, 2)) {
         if (hit.title && hit.url) {
@@ -192,7 +192,7 @@ export class ResearchWorker {
             source: 'HackerNews',
             relevanceScore: hit.points ? Math.min(hit.points / 100, 1) : 0.5,
             wordCount: hit.story_text ? hit.story_text.length : 500,
-            publishedAt: new Date(hit.created_at),
+            publishedAt: hit.created_at ? new Date(hit.created_at) : new Date(),
             sentiment: 'neutral'
           })
         }
