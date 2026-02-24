@@ -1,5 +1,13 @@
-// Direct implementation using the job processor
+// Direct implementation using the job processor.
+// Queue processes jobs by priority (high → normal → low), then FIFO within same priority.
+// Each job runs the research worker to search for the job's topic.
 import { ResearchJobData } from '../types'
+
+const PRIORITY_ORDER: Record<'high' | 'normal' | 'low', number> = {
+  high: 3,
+  normal: 2,
+  low: 1
+}
 
 interface QueueStats {
   waiting: number
@@ -9,14 +17,22 @@ interface QueueStats {
   total: number
 }
 
-// Simple in-memory job processor - embedded directly
+interface QueuedJob {
+  data: ResearchJobData
+  status: 'waiting' | 'active' | 'completed' | 'failed'
+  createdAt: Date
+  updatedAt: Date
+  error?: string
+}
+
+// In-memory job processor: priority-ordered queue, processes one job at a time, runs search by topic
 class EmbeddedJobProcessor {
-  private jobs: Map<string, any> = new Map()
+  private jobs: Map<string, QueuedJob> = new Map()
   private processing = false
 
   async addJob(data: ResearchJobData): Promise<{ id: string }> {
     const jobId = `job-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-    
+
     this.jobs.set(jobId, {
       data,
       status: 'waiting',
@@ -24,9 +40,8 @@ class EmbeddedJobProcessor {
       updatedAt: new Date()
     })
 
-    console.log(`📋 Adding job: ${jobId} for topic "${data.topic}"`)
-    
-    // Start processing if not already running
+    console.log(`📋 Adding job: ${jobId} for topic "${data.topic}" (priority: ${data.priority})`)
+
     if (!this.processing) {
       setImmediate(() => this.processNextJob())
     }
@@ -34,52 +49,53 @@ class EmbeddedJobProcessor {
     return { id: jobId }
   }
 
+  /** Pick next job: highest priority first, then oldest (FIFO) within same priority */
+  private getNextWaitingJob(): [string, QueuedJob] | null {
+    const waiting = Array.from(this.jobs.entries())
+      .filter(([, job]) => job.status === 'waiting')
+      .sort(([, a], [, b]) => {
+        const priorityDiff = (PRIORITY_ORDER[b.data.priority] ?? 2) - (PRIORITY_ORDER[a.data.priority] ?? 2)
+        if (priorityDiff !== 0) return priorityDiff
+        return a.createdAt.getTime() - b.createdAt.getTime()
+      })
+    return waiting.length > 0 ? waiting[0] : null
+  }
+
   private async processNextJob(): Promise<void> {
     if (this.processing) return
     this.processing = true
 
     try {
-      // Find next waiting job
-      for (const [jobId, job] of this.jobs.entries()) {
-        if (job.status === 'waiting') {
-          console.log(`� Processing job ${jobId}: "${job.data.topic}"`)
-          
-          job.status = 'active'
-          job.updatedAt = new Date()
-          
-          try {
-            // Use the research worker
-            const { ResearchWorker } = await import('../workers/research.worker')
-            const worker = new ResearchWorker()
-            await worker.processResearchTask(job.data)
-            
-            job.status = 'completed'
-            job.updatedAt = new Date()
-            console.log(`✅ Job ${jobId} completed successfully`)
-            
-            // Remove completed job after a delay
-            setTimeout(() => {
-              this.jobs.delete(jobId)
-            }, 30000) // Keep for 30 seconds
-            
-          } catch (error: any) {
-            console.error(`❌ Job ${jobId} failed:`, error.message)
-            job.status = 'failed'
-            job.error = error.message
-            job.updatedAt = new Date()
-          }
-          
-          break // Process one job at a time
-        }
+      const next = this.getNextWaitingJob()
+      if (!next) return
+
+      const [jobId, job] = next
+      console.log(`🔄 Processing job ${jobId}: "${job.data.topic}" (priority: ${job.data.priority})`)
+
+      job.status = 'active'
+      job.updatedAt = new Date()
+
+      try {
+        const { ResearchWorker } = await import('../workers/research.worker')
+        const worker = new ResearchWorker()
+        await worker.processResearchTask(job.data)
+        job.status = 'completed'
+        job.updatedAt = new Date()
+        console.log(`✅ Job ${jobId} completed successfully`)
+        setTimeout(() => this.jobs.delete(jobId), 30000)
+      } catch (error: any) {
+        console.error(`❌ Job ${jobId} failed:`, error.message)
+        job.status = 'failed'
+        job.error = error.message
+        job.updatedAt = new Date()
+      }
+
+      const hasWaitingJobs = Array.from(this.jobs.values()).some(j => j.status === 'waiting')
+      if (hasWaitingJobs) {
+        setTimeout(() => this.processNextJob(), 1000)
       }
     } finally {
       this.processing = false
-      
-      // Check if there are more jobs to process
-      const hasWaitingJobs = Array.from(this.jobs.values()).some(job => job.status === 'waiting')
-      if (hasWaitingJobs) {
-        setTimeout(() => this.processNextJob(), 1000) // Process next job after 1 second
-      }
     }
   }
 

@@ -8,7 +8,6 @@ import { queueManager } from './services/queue-manager'
 import researchRoutes from './routes/research.routes'
 // import debugRoutes from './api/debug'
 
-// Load environment variables
 dotenv.config()
 
 const app = express()
@@ -42,13 +41,10 @@ app.use((req, _res, next) => {
 // Enhanced health check endpoint
 app.get('/health', async (_req, res) => {
   try {
-    // Check database connection
     await prisma.$queryRaw`SELECT 1`
     
-    // Check Redis connection
     const redisOk = await testRedisConnection()
     
-    // Check queue manager
     const queueAvailable = queueManager.isAvailable()
     const queueStatsResult = await queueManager.getQueueStats()
     
@@ -155,4 +151,9 @@ async function startServer() {
   }
 }
 
-startServer()
+// Only start server when not in test (allows supertest to use app without listening)
+if (process.env['NODE_ENV'] !== 'test') {
+  startServer()
+}
+
+export { app }
